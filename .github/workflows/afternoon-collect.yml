@@ -1,0 +1,27 @@
+name: 낮 뉴스 수집 (14:30 KST)
+
+on:
+  schedule:
+    # 14:30 KST = 05:30 UTC
+    - cron: '30 5 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: '수집 슬롯'
+        required: false
+        default: 'afternoon'
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 낮 뉴스 수집 및 AI 분석 실행
+        run: |
+          curl -f -X POST "${{ secrets.APP_URL }}/api/collect" \
+            -H "Content-Type: application/json" \
+            -H "x-collect-secret: ${{ secrets.COLLECT_SECRET }}" \
+            -d '{"slot":"afternoon"}' \
+            --max-time 600 \
+            -w "\n응답 코드: %{http_code}\n"
