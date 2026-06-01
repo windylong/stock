@@ -49,13 +49,21 @@ async function getDashboardData() {
     }
 
     return { stocks: stocks || [], analyses, prices, marketAnalyses: marketAnalyses || [], dbReady: true }
-  } catch {
-    return { stocks: [], analyses: {}, prices: {}, marketAnalyses: [], dbReady: false }
+  } catch (e: any) {
+    console.error('[Dashboard] DB 연결 오류:', e?.message || e)
+    return {
+      stocks: [] as Stock[],
+      analyses: {} as Record<string, Analysis>,
+      prices: {} as Record<string, PriceSnapshot>,
+      marketAnalyses: [] as Analysis[],
+      dbReady: false,
+      dbError: String(e?.message || e),
+    }
   }
 }
 
 export default async function DashboardPage() {
-  const { stocks, analyses, prices, marketAnalyses, dbReady } = await getDashboardData()
+  const { stocks, analyses, prices, marketAnalyses, dbReady, dbError } = await getDashboardData()
 
   const now = new Date()
   const hour = now.getHours()
@@ -97,6 +105,9 @@ export default async function DashboardPage() {
           >
             SQL Editor 바로가기 →
           </a>
+          {dbError && (
+            <p className="mt-1 text-xs text-red-600 font-mono break-all">오류: {dbError}</p>
+          )}
         </div>
       )}
 
