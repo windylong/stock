@@ -9,51 +9,53 @@ import { ko } from 'date-fns/locale'
 export const dynamic = 'force-dynamic'
 
 async function getDashboardData() {
-  const supabase = createAdminClient()
+  try {
+    const supabase = createAdminClient()
 
-  const [{ data: stocks }, { data: marketAnalyses }, { data: latestPrices }] = await Promise.all([
-    supabase.from('stocks').select('*').order('market').order('name'),
-    supabase
-      .from('analyses')
-      .select('*')
-      .eq('ticker', 'MARKET')
-      .order('created_at', { ascending: false })
-      .limit(3),
-    supabase
-      .from('price_snapshots')
-      .select('*')
-      .order('recorded_at', { ascending: false })
-      .limit(50),
-  ])
+    const [{ data: stocks }, { data: marketAnalyses }, { data: latestPrices }] = await Promise.all([
+      supabase.from('stocks').select('*').order('market').order('name'),
+      supabase
+        .from('analyses')
+        .select('*')
+        .eq('ticker', 'MARKET')
+        .order('created_at', { ascending: false })
+        .limit(3),
+      supabase
+        .from('price_snapshots')
+        .select('*')
+        .order('recorded_at', { ascending: false })
+        .limit(50),
+    ])
 
-  // 종목별 최신 분석
-  const analyses: Record<string, Analysis> = {}
-  if (stocks?.length) {
-    const { data: allAnalyses } = await supabase
-      .from('analyses')
-      .select('*')
-      .in('ticker', stocks.map((s) => s.ticker))
-      .order('created_at', { ascending: false })
-      .limit(stocks.length * 3)
+    const analyses: Record<string, Analysis> = {}
+    if (stocks?.length) {
+      const { data: allAnalyses } = await supabase
+        .from('analyses')
+        .select('*')
+        .in('ticker', stocks.map((s) => s.ticker))
+        .order('created_at', { ascending: false })
+        .limit(stocks.length * 3)
 
-    for (const analysis of allAnalyses || []) {
-      if (!analyses[analysis.ticker]) {
-        analyses[analysis.ticker] = analysis
+      for (const analysis of allAnalyses || []) {
+        if (!analyses[analysis.ticker]) {
+          analyses[analysis.ticker] = analysis
+        }
       }
     }
-  }
 
-  // 종목별 최신 주가
-  const prices: Record<string, PriceSnapshot> = {}
-  for (const price of latestPrices || []) {
-    if (!prices[price.ticker]) prices[price.ticker] = price
-  }
+    const prices: Record<string, PriceSnapshot> = {}
+    for (const price of latestPrices || []) {
+      if (!prices[price.ticker]) prices[price.ticker] = price
+    }
 
-  return { stocks: stocks || [], analyses, prices, marketAnalyses: marketAnalyses || [] }
+    return { stocks: stocks || [], analyses, prices, marketAnalyses: marketAnalyses || [], dbReady: true }
+  } catch {
+    return { stocks: [], analyses: {}, prices: {}, marketAnalyses: [], dbReady: false }
+  }
 }
 
 export default async function DashboardPage() {
-  const { stocks, analyses, prices, marketAnalyses } = await getDashboardData()
+  const { stocks, analyses, prices, marketAnalyses, dbReady } = await getDashboardData()
 
   const now = new Date()
   const hour = now.getHours()
@@ -81,6 +83,22 @@ export default async function DashboardPage() {
           종목 추가
         </Link>
       </div>
+
+      {/* DB 미초기화 안내 */}
+      {!dbReady && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 text-sm text-amber-800">
+          <strong>⚠️ DB 초기화 필요</strong> — Supabase SQL Editor에서{' '}
+          <code className="bg-amber-100 px-1 rounded">supabase/schema.sql</code>을 실행해주세요.
+          <a
+            href="https://supabase.com/dashboard/project/bwoklujitltwqyjhwdoq/sql/new"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-2 underline font-medium"
+          >
+            SQL Editor 바로가기 →
+          </a>
+        </div>
+      )}
 
       {/* 시장 요약 */}
       {marketAnalyses.length > 0 && (
